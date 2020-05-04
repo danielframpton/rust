@@ -127,6 +127,7 @@ To learn more about a subcommand, run `./x.py <subcommand> -h`",
         opts.optflagmulti("v", "verbose", "use verbose output (-vv for very verbose)");
         opts.optflag("i", "incremental", "use incremental compilation");
         opts.optopt("", "config", "TOML configuration file for build", "FILE");
+        opts.optopt("", "stage0", "stage0 compiler to use to start bootstrap", "STAGE0");
         opts.optopt("", "build", "build target of the stage0 compiler", "BUILD");
         opts.optmulti("", "host", "host targets to build", "HOST");
         opts.optmulti("", "target", "target targets to build", "TARGET");

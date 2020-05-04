@@ -323,6 +323,7 @@ class RustBuild(object):
         self._download_url = ''
         self.rustc_channel = ''
         self.rustfmt_channel = ''
+        self.stage0 = ''
         self.build = ''
         self.build_dir = os.path.join(os.getcwd(), "build")
         self.clean = False
@@ -363,11 +364,17 @@ class RustBuild(object):
                 shutil.rmtree(self.bin_root())
             tarball_suffix = '.tar.xz' if support_xz() else '.tar.gz'
             filename = "rust-std-{}-{}{}".format(
-                rustc_channel, self.build, tarball_suffix)
-            pattern = "rust-std-{}".format(self.build)
+                rustc_channel, self.stage0, tarball_suffix)
+            pattern = "rust-std-{}".format(self.stage0)
             self._download_stage0_helper(filename, pattern, tarball_suffix)
 
-            filename = "rustc-{}-{}{}".format(rustc_channel, self.build,
+            if (self.build != self.stage0):
+                filename = "rust-std-{}-{}{}".format(
+                    rustc_channel, self.build, tarball_suffix)
+                pattern = "rust-std-{}".format(self.build)
+                self._download_stage0_helper(filename, pattern, tarball_suffix)
+
+            filename = "rustc-{}-{}{}".format(rustc_channel, self.stage0,
                                               tarball_suffix)
             self._download_stage0_helper(filename, "rustc", tarball_suffix)
             self.fix_executable("{}/bin/rustc".format(self.bin_root()))
@@ -378,16 +385,16 @@ class RustBuild(object):
             # This is required so that we don't mix incompatible MinGW
             # libraries/binaries that are included in rust-std with
             # the system MinGW ones.
-            if "pc-windows-gnu" in self.build:
+            if "pc-windows-gnu" in self.stage0:
                 filename = "rust-mingw-{}-{}{}".format(
-                    rustc_channel, self.build, tarball_suffix)
+                    rustc_channel, self.stage0, tarball_suffix)
                 self._download_stage0_helper(filename, "rust-mingw", tarball_suffix)
 
         if self.cargo().startswith(self.bin_root()) and \
                 (not os.path.exists(self.cargo()) or
                  self.program_out_of_date(self.cargo_stamp())):
             tarball_suffix = '.tar.xz' if support_xz() else '.tar.gz'
-            filename = "cargo-{}-{}{}".format(cargo_channel, self.build,
+            filename = "cargo-{}-{}{}".format(cargo_channel, self.stage0,
                                               tarball_suffix)
             self._download_stage0_helper(filename, "cargo", tarball_suffix)
             self.fix_executable("{}/bin/cargo".format(self.bin_root()))
@@ -401,7 +408,7 @@ class RustBuild(object):
             if rustfmt_channel:
                 tarball_suffix = '.tar.xz' if support_xz() else '.tar.gz'
                 [channel, date] = rustfmt_channel.split('-', 1)
-                filename = "rustfmt-{}-{}{}".format(channel, self.build, tarball_suffix)
+                filename = "rustfmt-{}-{}{}".format(channel, self.stage0, tarball_suffix)
                 self._download_stage0_helper(filename, "rustfmt-preview", tarball_suffix, date)
                 self.fix_executable("{}/bin/rustfmt".format(self.bin_root()))
                 self.fix_executable("{}/bin/cargo-fmt".format(self.bin_root()))
@@ -541,7 +548,7 @@ class RustBuild(object):
         >>> rb.bin_root() == os.path.join("build", "devel", "stage0")
         True
         """
-        return os.path.join(self.build_dir, self.build, "stage0")
+        return os.path.join(self.build_dir, self.stage0, "stage0")
 
     def get_toml(self, key, section=None):
         """Returns the value of the given key in config.toml, otherwise returns None
@@ -656,7 +663,7 @@ class RustBuild(object):
         ... "debug", "bootstrap")
         True
         """
-        return os.path.join(self.build_dir, "bootstrap", "debug", "bootstrap")
+        return os.path.join(self.build_dir, "bootstrap", self.build_triple(), "debug", "bootstrap")
 
     def build_bootstrap(self):
         """Build bootstrap"""
@@ -664,10 +671,7 @@ class RustBuild(object):
         if self.clean and os.path.exists(build_dir):
             shutil.rmtree(build_dir)
         env = os.environ.copy()
-        # `CARGO_BUILD_TARGET` breaks bootstrap build.
-        # See also: <https://github.com/rust-lang/rust/issues/70208>.
-        if "CARGO_BUILD_TARGET" in env:
-            del env["CARGO_BUILD_TARGET"]
+        env["CARGO_TARGET_DIR"] = self.build_triple()
         env["RUSTC_BOOTSTRAP"] = '1'
         env["CARGO_TARGET_DIR"] = build_dir
         env["RUSTC"] = self.rustc()
@@ -712,6 +716,7 @@ class RustBuild(object):
             args.append("--locked")
         if self.use_vendored_sources:
             args.append("--frozen")
+        args.append("--target={}".format(self.build_triple()))
         run(args, env=env, verbose=self.verbose)
 
     def build_triple(self):
@@ -871,6 +876,7 @@ def bootstrap(help_triggered):
     parser = argparse.ArgumentParser(description='Build rust')
     parser.add_argument('--config')
     parser.add_argument('--build')
+    parser.add_argument('--stage0')
     parser.add_argument('--src')
     parser.add_argument('--clean', action='store_true')
     parser.add_argument('-v', '--verbose', action='count', default=0)
@@ -917,6 +923,7 @@ def bootstrap(help_triggered):
 
     # Fetch/build the bootstrap
     build.build = args.build or build.build_triple()
+    build.stage0 = args.stage0 or build.build
     build.download_stage0()
     sys.stdout.flush()
     build.ensure_vendored()

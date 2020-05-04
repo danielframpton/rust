@@ -682,7 +682,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn rustdoc_cmd(&self, compiler: Compiler) -> Command {
-        let mut cmd = Command::new(&self.out.join("bootstrap/debug/rustdoc"));
+        let mut cmd = Command::new(&self.out.join("bootstrap").join(compiler.host).join("debug/rustdoc"));
         cmd.env("RUSTC_STAGE", compiler.stage.to_string())
             .env("RUSTC_SYSROOT", self.sysroot(compiler))
             // Note that this is *not* the sysroot_libdir because rustdoc must be linked
@@ -907,13 +907,13 @@ impl<'a> Builder<'a> {
         // src/bootstrap/bin/{rustc.rs,rustdoc.rs}
         cargo
             .env("RUSTBUILD_NATIVE_DIR", self.native_dir(target))
-            .env("RUSTC", self.out.join("bootstrap/debug/rustc"))
+            .env("RUSTC", self.out.join("bootstrap").join(compiler.host).join("debug/rustc"))
             .env("RUSTC_REAL", self.rustc(compiler))
             .env("RUSTC_STAGE", stage.to_string())
             .env("RUSTC_DEBUG_ASSERTIONS", self.config.rust_debug_assertions.to_string())
             .env("RUSTC_SYSROOT", &sysroot)
             .env("RUSTC_LIBDIR", &libdir)
-            .env("RUSTDOC", self.out.join("bootstrap/debug/rustdoc"))
+            .env("RUSTDOC", self.out.join("bootstrap").join(compiler.host).join("debug/rustdoc"))
             .env(
                 "RUSTDOC_REAL",
                 if cmd == "doc" || cmd == "rustdoc" || (cmd == "test" && want_rustdoc) {
